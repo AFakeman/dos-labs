@@ -16,6 +16,24 @@ typedef unsigned short uint16_t;
 typedef unsigned int uint32_t;
 typedef unsigned int bool_t;
 
+typedef union _gate_t
+{
+    struct {
+        uint32_t raw_lo;
+        uint32_t raw_hi;
+    };
+    struct {
+        uint16_t offset_low;        //offset my_pf_handler (lo)
+        uint16_t selector;          //seg my_pf_handler
+        uint8_t zero;               //0
+        uint8_t type:4;             //T=1111    T=1110
+        uint8_t S:1;                //S=0       S=0
+        uint8_t DPL:2;              //DPL=3     DPL=0
+        uint8_t P:1;                //P=1       P=1
+        uint16_t offset_high;       //offset my_pf_handler (hi)
+    };
+} gate_t;
+
 typedef union _selector_t
 {
     uint16_t raw;
@@ -108,6 +126,9 @@ void main()
         descriptor_t* pDesc;
         uint32_t base;
         uint32_t limit;
+        gate_t *idt_base;
+        uint16_t idt_count;
+        uint16_t idx;
 
         __asm {
             mov ax, cs
@@ -150,7 +171,22 @@ void main()
             base, limit,
             pDesc->L,
             pDesc->DB,
-            pDesc->access_rights);                    
+            pDesc->access_rights);
+
+        idt_base = (gate_t*) _idt.base;
+        idt_count = _idt.limit / sizeof(gate_t);
+        for (idx = 0; idx < idt_count; ++idx) {
+            printf("GATE %h: offset_low=0x%04X selector=0x%04X, type=0x%X, S=%d, DPL=%d, P=%d, offset_high=0x%04X\n",
+            idt_base[idx].offset_low,
+            idt_base[idx].selector,
+            idt_base[idx].type,
+            idt_base[idx].S,
+            idt_base[idx].DPL,
+            idt_base[idx].P,
+            idt_base[idx].offset_high
+                );
+            getchar();
+        }
     }
 
     printf("EXPECTED PANIC \n");
