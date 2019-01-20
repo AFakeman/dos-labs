@@ -6,6 +6,7 @@
  */
 
 #include "stdio.h"
+#include "stdlib.h"
 
 #define EXC_PF 14
 
@@ -16,6 +17,15 @@
 #define PDE_TRIVIAL     0x083  // PS=1  D=0  A=0 PCD=0
                                //PWT=0 US=0 RW=1 P=1
 #define PDE_TRIVIAL_NP  0x082  //same but P=0
+// same but PS=1
+#define PDE_NON_TRIVIAL 0x0C3
+// same but PS=1 P=0
+#define PDE_NON_TRIVIAL_NP 0x0C2
+
+#define SPECIAL_ADDRESS 0xDEADFACE
+// R=1 P=0
+#define PTE_FLAGS 0x2
+#define PTE_FLAGS_P 0x3
 
 typedef unsigned char uint8_t;
 typedef unsigned short uint16_t;
@@ -87,6 +97,7 @@ uint32_t old_pf_ofs, new_pf_ofs;
 uint32_t pf_counter = 0;
 
 uint32_t* pPageDirectory;
+uint32_t* pPageEntries;
 
 void __declspec(naked) my_pf_handler(void)
 {
@@ -103,8 +114,15 @@ void __declspec(naked) my_pf_handler(void)
     __asm {
         push eax
         push ebx
+
+        mov ax, ds
+        mov es, ax
+        mov ah, 09h
+        mov edx, gstr
+        int 21h
+
         mov eax, cr2
-        cmp eax, 0xDEADFACE
+        cmp eax, SPECIAL_ADDRESS
         jz new
 old:
         pop ebx
@@ -119,6 +137,13 @@ new:
         shr eax, 20
         add ebx, eax    //eax = pPageDirectory[pdi]
         or [ebx], 1
+       // mov ebx, [ebx]
+       // and ebx, 0xFFFFF000
+       // mov eax, cr2
+       // and eax, 0x3FF000
+       // shr eax, 10
+       // add ebx, eax   //eax = pPageEntries[pei]
+       // or [ebx], 1
         pop ebx
         pop eax
         add esp, 4
@@ -226,12 +251,32 @@ void main()
 #define BIG_PAGE_MASK2  (~BIG_PAGE_MASK1)       //0xFFC00000
 #define BIG_PAGE_ALIGN(addr) (((addr)+BIG_PAGE_MASK1)&BIG_PAGE_MASK2)
     pPageDirectory = (uint32_t*) BIG_PAGE_ALIGN(p);
-    
+
+    p = (uint32_t) malloc(8*1024);
+    if (!p) {
+        printf("BAD MALLOC\n");
+    }
+    pPageEntries = (uint32_t*) BIG_PAGE_ALIGN(p);
+
     //any page table is a 4K block with 1024*4b entries
     for (i=0; i<1024; i++)
     {
         pPageDirectory[i] = (i<<22) | ((i<512) ? PDE_TRIVIAL : PDE_TRIVIAL_NP);
+        pPageEntries[i] = (i<<22) | PTE_FLAGS;
     }
+
+    //{
+    //    uint32_t pte_idx;
+    //    uint32_t pde_idx;
+    //    uint32_t block_addr = SPECIAL_ADDRESS & 0xFFFFF000;
+    //    pde_idx = SPECIAL_ADDRESS >> 22;
+    //    printf("PDE_IDX=0x%08X\n", pde_idx);
+    //    pPageDirectory[pde_idx] = ((uint32_t) pPageEntries) | PDE_NON_TRIVIAL;
+    //    pte_idx = (SPECIAL_ADDRESS >> 12) & 0x3FF;
+    //    printf("PTE_IDX=0x%08X\n", pte_idx);
+    //    pPageEntries[pte_idx] = block_addr | PTE_FLAGS_P;
+    //    printf("BLK_IDX=0x%08X\n", block_addr);
+    //}
 
     __asm {
         mov eax, pPageDirectory
@@ -259,13 +304,13 @@ void main()
     //get pagefault at non-present address
     {
         uint8_t* pByte1 = (uint8_t*)100;            //100 < 2Gb => ok
-        uint8_t* pByte2 = (uint8_t*)0xDEADFACE;     //    > 2Gb => pagefault
+        uint8_t* pByte2 = (uint8_t*)SPECIAL_ADDRESS;     //    > 2Gb => pagefault
         uint8_t* pByte3 = (uint8_t*)0xDEADFACF;     //    > 2Gb => pagefault
         uint8_t b = *pByte1;
         printf("[100]=%x \n", b);
         printf("PF counter = %d \n", pf_counter);
         b = *pByte2;
-        printf("[0xDEADFACE]=%x \n", b);
+        printf("[0x%s]=%x \n", SPECIAL_ADDRESS, b);
         printf("PF counter = %d \n", pf_counter);
         b = *pByte3;
         printf("[0xDEADFACF]=%x \n", b);
