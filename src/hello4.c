@@ -172,6 +172,7 @@ old:
         pop edx
         pop ebx
         pop eax
+        mov eax, [esp]
         push dword ptr old_pf_seg	//need to push 4 bytes
         push old_pf_ofs
         retf
@@ -331,6 +332,7 @@ void main()
     p = (uint32_t) malloc(8*1024*1024);
     if (!p) {
         printf("BAD MALLOC\n");
+        getchar();
     }
     pPageEntries = (uint32_t*) BIG_PAGE_ALIGN(p);
 
@@ -367,9 +369,7 @@ void main()
     __asm {
         cli                     //disable interrupt
         mov eax, cr4
-        mov ebx, 10h
-        not ebx
-        and  eax, ebx            //enable 4Mb (1 << CR4_PS)
+        or  eax, 10h            //enable 4Mb (1 << CR4_PS)
         mov cr4, eax        
         mov eax, cr0
         or  eax, 80000000h      //enable paging (1 << CR0_PG)
