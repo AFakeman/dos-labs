@@ -167,11 +167,12 @@ void __declspec(naked) my_pf_handler(void)
         //add esp, 4
 
         cmp eax, SPECIAL_ADDRESS
-        jz new
+        //jz new
 old:
         pop edx
         pop ebx
         pop eax
+        call printhex
         mov eax, [esp]
         push dword ptr old_pf_seg	//need to push 4 bytes
         push old_pf_ofs
@@ -329,7 +330,7 @@ void main()
 #define BIG_PAGE_ALIGN(addr) (((addr)+BIG_PAGE_MASK1)&BIG_PAGE_MASK2)
     pPageDirectory = (uint32_t*) BIG_PAGE_ALIGN(p);
 
-    p = (uint32_t) malloc(8*1024*1024);
+    p = (uint32_t) malloc(8*1024);
     if (!p) {
         printf("BAD MALLOC\n");
         getchar();
@@ -339,14 +340,11 @@ void main()
     //any page table is a 4K block with 1024*4b entries
     for (i=0; i<1024; i++)
     {
-        pPageDirectory[i] = ((uint32_t)&pPageEntries[i << 10])
-                                | ((i<512) ? PDE_NON_TRIVIAL : PDE_NON_TRIVIAL);
-        for (j=0; j < 1024; ++j) {
-            pPageEntries[(i << 10) | j] = (i<<22) | (j<<12) | PTE_FLAGS;
-        }
+        pPageDirectory[i] = (i << 22) | ((i<512) ? PDE_TRIVIAL : PDE_TRIVIAL);
+        pPageEntries[i] = (SPECIAL_ADDRESS & 0xFFC00000) | (i<<12) | PTE_FLAGS;
     }
 
-    /*{
+    {
         uint32_t pte_idx;
         uint32_t pde_idx;
         uint32_t block_addr = SPECIAL_ADDRESS & 0xFFFFF000;
@@ -358,7 +356,7 @@ void main()
         pPageEntries[pte_idx] = block_addr | PTE_FLAGS_P;
         printf("PTE_ADR=0x%08X\n", &pPageEntries[pte_idx]);
         printf("PTE_VAL=0x%08X\n",  pPageEntries[pte_idx]);
-    }*/
+    }
 
     __asm {
         mov eax, pPageDirectory
