@@ -160,15 +160,15 @@ void main()
         pDesc = (descriptor_t*) _gdt.base;
         idt_count = _gdt.limit / sizeof(descriptor_t);
 
-        for (idx = 0; idx < idt_count; ++idx) {
-            printf("DESC: raw=0x%08X'%08X base=0x%08X limit=0x%08X L=%x DB=%x AR=0x%04X \n",
-                pDesc[idx].raw_high, pDesc[idx].raw_low,
-                base, limit,
-                pDesc[idx].L,
-                pDesc[idx].DB,
-                pDesc[idx].access_rights);
-            getchar();
-        }
+        // for (idx = 0; idx < idt_count; ++idx) {
+        //     printf("DESC: raw=0x%08X'%08X base=0x%08X limit=0x%08X L=%x DB=%x AR=0x%04X \n",
+        //         pDesc[idx].raw_high, pDesc[idx].raw_low,
+        //         base, limit,
+        //         pDesc[idx].L,
+        //         pDesc[idx].DB,
+        //         pDesc[idx].access_rights);
+        //     getchar();
+        // }
 
         sel.raw = _ds;
         printf("SEL: raw=0x%04X index=%x table=%x rpl=%x \n", sel.raw, sel.index, sel.table, sel.rpl);
